@@ -1,17 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  FlatList,
-  Image,
-  TouchableOpacity,
-  SafeAreaView,
-  Animated,
-  TextInput,
-  Modal,
-  Dimensions,
-} from 'react-native';
+import {StyleSheet,Text,View,FlatList,Image,TouchableOpacity,SafeAreaView,Animated,TextInput,Modal,Dimensions,} from 'react-native';
+import { COLORS } from '../constants/theme';
 
 const INITIAL_CHATS_DATA = [
   {
@@ -238,13 +227,11 @@ const HomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.noir
   },
   header: {
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.noir,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -252,7 +239,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#000000',
+    color: COLORS.white,
   },
   editButton: {
     color: '#007AFF',
@@ -260,9 +247,6 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     padding: 12,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
   },
   searchInput: {
     backgroundColor: '#f0f0f0',
@@ -304,9 +288,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-
-
-
 
   chatInfo: {
     flex: 1,
@@ -354,9 +335,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-
-
-
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
