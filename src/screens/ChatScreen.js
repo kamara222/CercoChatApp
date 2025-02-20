@@ -1,29 +1,83 @@
 // ChatScreen.js
+/**
+ * Écran de chat permettant aux utilisateurs d'envoyer et recevoir des messages
+ * Fonctionnalités:
+ * - Affichage des messages en temps réel
+ * - Indicateur de frappe
+ * - Statut des messages (envoyé, délivré, lu)
+ * - Chargement pagination des anciens messages
+ * - Interface utilisateur responsive
+ */
+
 import React, { useState, useRef, useEffect } from 'react';
-import {StyleSheet,Text,View,FlatList,TextInput,TouchableOpacity,KeyboardAvoidingView,Platform,ActivityIndicator,Dimensions,Image,Alert,} from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  FlatList,
+  TextInput,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  Dimensions,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Icon from 'react-native-vector-icons/Ionicons'; // Import des icônes Ionicons
 import { COLORS } from '../constants/theme';
 
-// Mock des données initiales pour les messages
+// Messages initiaux pour le développement
 const INITIAL_MESSAGES = [
   {
     id: '1',
     text: 'Bonjour!',
-    timestamp: new Date(Date.now() - 3600000).toISOString(), // 1 heure avant
+    timestamp: new Date(Date.now() - 3600000).toISOString(),
     isSent: false,
-    status: 'read', // 'sent', 'delivered', 'read'
+    status: 'read',
   },
   {
     id: '2',
     text: 'Comment allez-vous?',
-    timestamp: new Date(Date.now() - 1800000).toISOString(), // 30 minutes avant
+    timestamp: new Date(Date.now() - 1800000).toISOString(),
     isSent: true,
     status: 'read',
   },
 ];
 
+/**
+ * Composant pour l'avatar affichant la première lettre du nom
+ * @param {Object} props - Les propriétés du composant
+ * @param {string} props.name - Le nom dont on affiche la première lettre
+ */
+const LetterAvatar = ({ name }) => (
+  <View style={styles.avatarContainer}>
+    <Text style={styles.avatarText}>
+      {name.charAt(0).toUpperCase()}
+    </Text>
+  </View>
+);
+
+/**
+ * Composant d'en-tête du chat
+ * @param {Object} props - Les propriétés du composant
+ * @param {string} props.name - Nom de l'interlocuteur
+ * @param {Function} props.onBackPress - Fonction appelée lors du clic sur le bouton retour
+ */
+const ChatHeader = ({ name, onBackPress }) => (
+  <View style={styles.header}>
+    <TouchableOpacity onPress={onBackPress} style={styles.backButton}>
+      <Icon name="arrow-back" size={24} color={COLORS.white} />
+    </TouchableOpacity>
+    <LetterAvatar name={name} />
+    <Text style={styles.headerTitle}>{name}</Text>
+  </View>
+);
+
+/**
+ * Composant principal de l'écran de chat
+ */
 const ChatScreen = ({ route, navigation }) => {
-  // Récupération des paramètres de navigation
+  // Extraction des paramètres de navigation
   const { chatId, name, updateLastMessage } = route.params;
   
   // États du composant
@@ -38,16 +92,27 @@ const ChatScreen = ({ route, navigation }) => {
   const typingTimeoutRef = useRef(null);
   const loadingMoreRef = useRef(false);
 
-  // Effet pour simuler le chargement initial des messages
+  /**
+   * Charge les messages initiaux au montage du composant
+   */
   useEffect(() => {
     loadInitialMessages();
   }, [chatId]);
 
-  // Fonction pour charger les messages initiaux
+  /**
+   * Gère le retour à l'écran précédent
+   */
+  const handleBack = () => {
+    navigation.goBack();
+  };
+
+  /**
+   * Charge les messages initiaux depuis l'API
+   */
   const loadInitialMessages = async () => {
     setIsLoading(true);
     try {
-      // Simuler un appel API
+      // Simulation d'un appel API
       await new Promise(resolve => setTimeout(resolve, 1000));
       setMessages(INITIAL_MESSAGES);
     } catch (error) {
@@ -57,13 +122,14 @@ const ChatScreen = ({ route, navigation }) => {
     }
   };
 
-  // Fonction pour charger plus de messages (pagination)
+  /**
+   * Charge plus de messages anciens (pagination)
+   */
   const loadMoreMessages = async () => {
     if (!hasMoreMessages || loadingMoreRef.current) return;
     
     loadingMoreRef.current = true;
     try {
-      // Simuler un appel API pour charger plus de messages
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       const oldestMessageDate = new Date(messages[messages.length - 1].timestamp);
@@ -79,7 +145,6 @@ const ChatScreen = ({ route, navigation }) => {
       
       setMessages(prev => [...prev, ...newMessages]);
       
-      // Simuler la fin des messages
       if (messages.length > 30) {
         setHasMoreMessages(false);
       }
@@ -90,29 +155,28 @@ const ChatScreen = ({ route, navigation }) => {
     }
   };
 
-  // Gestion de la frappe
+  /**
+   * Gère la saisie de message et l'indicateur de frappe
+   */
   const handleTyping = (text) => {
     setInputMessage(text);
     
-    // Gestion de l'indicateur de frappe
     if (!isTyping) {
       setIsTyping(true);
-      // Simuler l'envoi du statut "en train d'écrire" au serveur
     }
 
-    // Réinitialiser le timeout précédent
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
     }
 
-    // Définir un nouveau timeout
     typingTimeoutRef.current = setTimeout(() => {
       setIsTyping(false);
-      // Simuler l'envoi du statut "a cessé d'écrire" au serveur
     }, 1500);
   };
 
-  // Envoi d'un message
+  /**
+   * Envoie un nouveau message
+   */
   const handleSend = async () => {
     if (!inputMessage.trim()) return;
 
@@ -124,21 +188,15 @@ const ChatScreen = ({ route, navigation }) => {
       status: 'sent',
     };
 
-    // Ajouter le message localement
     setMessages(prev => [newMessage, ...prev]);
     setInputMessage('');
-    
-    // Mettre à jour le dernier message dans la liste des chats
     updateLastMessage?.(chatId, newMessage.text);
 
-    // Faire défiler jusqu'au nouveau message
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
 
     try {
-      // Simuler l'envoi au serveur
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Mettre à jour le statut du message
       setMessages(prev =>
         prev.map(msg =>
           msg.id === newMessage.id
@@ -147,7 +205,7 @@ const ChatScreen = ({ route, navigation }) => {
         )
       );
 
-      // Simuler une réponse automatique
+      // Simulation d'une réponse automatique
       const autoResponse = {
         id: (Date.now() + 1).toString(),
         text: `Réponse automatique à : ${newMessage.text}`,
@@ -165,7 +223,9 @@ const ChatScreen = ({ route, navigation }) => {
     }
   };
 
-  // Rendu d'un message
+  /**
+   * Rendu d'un message individuel
+   */
   const renderMessage = ({ item }) => (
     <View style={[
       styles.messageContainer,
@@ -188,27 +248,27 @@ const ChatScreen = ({ route, navigation }) => {
         
         {item.isSent && (
           <View style={styles.messageStatus}>
-            {item.status === 'sent' && <Text>✓</Text>}
-            {item.status === 'delivered' && <Text>✓✓</Text>}
-            {item.status === 'read' && <Text style={styles.messageStatusRead}>✓✓</Text>}
+            {item.status === 'sent' && <Icon name="checkmark" size={16} color={COLORS.white} />}
+            {item.status === 'delivered' && <Icon name="checkmark-done" size={16} color={COLORS.white} />}
+            {item.status === 'read' && <Icon name="checkmark-done" size={16} color={COLORS.primary} />}
           </View>
         )}
       </View>
     </View>
   );
 
-  // Rendu du composant
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
+      <ChatHeader name={name} onBackPress={handleBack} />
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
       >
-        {/* Liste des messages */}
+        {/* Zone des messages */}
         {isLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#007AFF" />
+            <ActivityIndicator size="large" color={COLORS.primary} />
           </View>
         ) : (
           <FlatList
@@ -231,7 +291,7 @@ const ChatScreen = ({ route, navigation }) => {
         {/* Indicateur de frappe */}
         {isTyping && (
           <View style={styles.typingIndicator}>
-            <ActivityIndicator size="small" color="#007AFF" />
+            <ActivityIndicator size="small" color={COLORS.primary} />
             <Text style={styles.typingText}>En train d'écrire...</Text>
           </View>
         )}
@@ -248,16 +308,18 @@ const ChatScreen = ({ route, navigation }) => {
             maxLength={500}
           />
           <TouchableOpacity
-            style={[styles.sendButton, !inputMessage.trim() && styles.sendButtonDisabled]}
+            style={[
+              styles.sendButton,
+              !inputMessage.trim() && styles.sendButtonDisabled
+            ]}
             onPress={handleSend}
             disabled={!inputMessage.trim()}
           >
-            <Text style={[
-              styles.sendButtonText,
-              !inputMessage.trim() && styles.sendButtonTextDisabled
-            ]}>
-              Envoyer
-            </Text>
+            <Icon
+              name="send"
+              size={24}
+              color={inputMessage.trim() ? COLORS.primary : '#999999'}
+            />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -270,6 +332,39 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.noir,
   },
+  // Styles du header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#262628',
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.white,
+    marginLeft: 12,
+  },
+  // Styles de l'avatar
+  avatarContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  avatarText: {
+    color: COLORS.white,
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  // Styles des messages
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -279,15 +374,12 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   messageContainer: {
-    maxWidth: '90%',
+    maxWidth: '80%',
     marginVertical: 4,
-    padding: 10,
+    padding: 12,
     borderRadius: 16,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
@@ -303,13 +395,12 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 16,
     marginBottom: 4,
-    
   },
   sentMessageText: {
-    color: '#FFFFFF',
+    color: COLORS.white,
   },
   receivedMessageText: {
-    color:COLORS.white,
+    color: COLORS.white,
   },
   messageFooter: {
     flexDirection: 'row',
@@ -320,12 +411,39 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.white,
     marginRight: 4,
+    opacity: 0.7,
   },
   messageStatus: {
     flexDirection: 'row',
   },
-  messageStatusRead: {
-    color: '#007AFF',
+  // Styles de la zone de saisie
+  inputContainer: {
+    flexDirection: 'row',
+    padding: 16,
+    backgroundColor: COLORS.noir,
+    alignItems: 'flex-end',
+    borderTopWidth: 1,
+    borderTopColor: '#262628',
+  },
+  input: {
+    flex: 1,
+    backgroundColor: '#262628',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 8,
+    maxHeight: 100,
+    color: COLORS.white,
+  },
+  sendButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  sendButtonDisabled: {
+    opacity: 0.5,
   },
   typingIndicator: {
     flexDirection: 'row',
@@ -337,36 +455,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     color: '#666',
     fontSize: 12,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    padding: 16,
-    backgroundColor: COLORS.noir,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: COLORS.noir,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 8,
-    maxHeight: 100,
-  },
-  sendButton: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-  },
-  sendButtonDisabled: {
-    opacity: 0.5,
-  },
-  sendButtonText: {
-    color: COLORS.primary,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  sendButtonTextDisabled: {
-    color: '#999999',
   },
   loadingMore: {
     padding: 16,
