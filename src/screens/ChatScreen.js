@@ -1,14 +1,4 @@
 // ChatScreen.js
-/**
- * Écran de chat permettant aux utilisateurs d'envoyer et recevoir des messages
- * Fonctionnalités:
- * - Affichage des messages en temps réel
- * - Indicateur de frappe
- * - Statut des messages (envoyé, délivré, lu)
- * - Chargement pagination des anciens messages
- * - Interface utilisateur responsive
- */
-
 import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet,

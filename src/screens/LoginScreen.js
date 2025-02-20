@@ -32,7 +32,8 @@ const LoginScreen = () => {
 
   const handleLogin = () => {
     console.log('Numéro de téléphone:', `${selectedCode} ${phoneNumber}`);
-    navigation.navigate('MainTabs'); // Navigue vers HomeScreen
+    // navigation.navigate('MainTabs'); // Navigue vers HomeScreen
+    navigation.navigate('ChatList'); // Navigue vers HomeScreen
   };
 
   return (
