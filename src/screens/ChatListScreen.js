@@ -1,30 +1,5 @@
-// import { StyleSheet, Text, View } from 'react-native'
-// import React from 'react'
-
-// const ChatListScreen = () => {
-//   return (
-//     <View>
-//       <Text>ChatListScreen</Text>
-//     </View>
-//   )
-// }
-
-// export default ChatListScreen
-
-// const styles = StyleSheet.create({})
-
-
-
 import React from 'react';
-import {
-  View,
-  FlatList,
-  Text,
-  Image,
-  TouchableOpacity,
-  StyleSheet,
-  TextInput,
-} from 'react-native';
+import { View, FlatList, Text, Image, TouchableOpacity, StyleSheet, TextInput, } from 'react-native';
 
 const ChatListScreen = ({ navigation }) => {
   // Données de test

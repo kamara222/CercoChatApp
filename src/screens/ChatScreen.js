@@ -1,19 +1,6 @@
 // ChatScreen.js
 import React, { useState, useRef, useEffect } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  FlatList,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  Dimensions,
-  Image,
-  Alert,
-} from 'react-native';
+import {StyleSheet,Text,View,FlatList,TextInput,TouchableOpacity,KeyboardAvoidingView,Platform,ActivityIndicator,Dimensions,Image,Alert,} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
 
@@ -256,6 +243,7 @@ const ChatScreen = ({ route, navigation }) => {
             value={inputMessage}
             onChangeText={handleTyping}
             placeholder="Écrivez un message..."
+            placeholderTextColor="#424242"
             multiline
             maxLength={500}
           />
@@ -291,9 +279,9 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   messageContainer: {
-    maxWidth: '80%',
+    maxWidth: '90%',
     marginVertical: 4,
-    padding: 12,
+    padding: 10,
     borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: {
@@ -306,21 +294,22 @@ const styles = StyleSheet.create({
   },
   sentMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: '#007AFF',
+    backgroundColor: COLORS.primary,
   },
   receivedMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#262628',
   },
   messageText: {
     fontSize: 16,
     marginBottom: 4,
+    
   },
   sentMessageText: {
     color: '#FFFFFF',
   },
   receivedMessageText: {
-    color: '#000000',
+    color:COLORS.white,
   },
   messageFooter: {
     flexDirection: 'row',
@@ -329,7 +318,7 @@ const styles = StyleSheet.create({
   },
   messageTimestamp: {
     fontSize: 12,
-    color: '#00000080',
+    color: COLORS.white,
     marginRight: 4,
   },
   messageStatus: {
@@ -356,7 +345,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: COLORS.noir,
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -372,7 +361,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   sendButtonText: {
-    color: '#007AFF',
+    color: COLORS.primary,
     fontSize: 16,
     fontWeight: '600',
   },
