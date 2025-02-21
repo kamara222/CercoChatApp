@@ -1,20 +1,3 @@
-// import { StyleSheet, Text, View } from 'react-native'
-// import React from 'react'
-
-// const ChatListScreen = () => {
-//   return (
-//     <View>
-//       <Text>ChatListScreen</Text>
-//     </View>
-//   )
-// }
-
-// export default ChatListScreen
-
-// const styles = StyleSheet.create({})
-
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
@@ -50,6 +33,14 @@ const INITIAL_CHATS_DATA = [
     timestamp: new Date().toISOString(),
     avatar: 'https://randomuser.me/api/portraits/women/1.jpg',
     unread: 2,
+  },
+  {
+    id: '3',
+    name: 'Bamba',
+    lastMessage: 'Tu fait quoi ?',
+    timestamp: new Date().toISOString(),
+    avatar: 'https://randomuser.me/api/portraits/women/1.jpg',
+    unread: 1,
   },
 ];
 
