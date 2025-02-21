@@ -1,111 +1,165 @@
-// ChatScreen.js
-import React, { useState, useRef, useEffect } from 'react';
+/**
+ * Application de Chat React Native
+ * Composant ChatScreen avec fonctionnalités avancées
+ * 
+ * Fonctionnalités principales :
+ * - Interface de chat en temps réel
+ * - Gestion des statuts en ligne/hors ligne
+ * - Retour haptique
+ * - Chargement des messages par lots
+ * - Indicateur de frappe
+ * - Thème sombre personnalisé
+ */
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  StyleSheet,
-  Text,
   View,
-  FlatList,
-  TextInput,
+  StyleSheet,
   TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
-  Dimensions,
+  Alert,
+  Text,
+  Platform,
+  Vibration,
+  PermissionsAndroid,
 } from 'react-native';
+import { GiftedChat, Bubble, Send, SystemMessage, Composer, InputToolbar } from 'react-native-gifted-chat';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/Ionicons'; // Import des icônes Ionicons
+import Icon from 'react-native-vector-icons/Ionicons';
 import { COLORS } from '../constants/theme';
 
-// Messages initiaux pour le développement
+/**
+ * Messages de test pour le développement
+ * Chaque message contient un ID unique, texte, timestamp, et statut
+ */
 const INITIAL_MESSAGES = [
   {
     id: '1',
     text: 'Bonjour!',
-    timestamp: new Date(Date.now() - 3600000).toISOString(),
+    timestamp: new Date(Date.now() - 3600000).toISOString(), // 1 heure avant
     isSent: false,
     status: 'read',
   },
   {
     id: '2',
     text: 'Comment allez-vous?',
-    timestamp: new Date(Date.now() - 1800000).toISOString(),
+    timestamp: new Date(Date.now() - 1800000).toISOString(), // 30 minutes avant
     isSent: true,
     status: 'read',
   },
 ];
 
 /**
- * Composant pour l'avatar affichant la première lettre du nom
- * @param {Object} props - Les propriétés du composant
- * @param {string} props.name - Le nom dont on affiche la première lettre
- */
-const LetterAvatar = ({ name }) => (
-  <View style={styles.avatarContainer}>
-    <Text style={styles.avatarText}>
-      {name.charAt(0).toUpperCase()}
-    </Text>
-  </View>
-);
-
-/**
  * Composant d'en-tête du chat
- * @param {Object} props - Les propriétés du composant
- * @param {string} props.name - Nom de l'interlocuteur
- * @param {Function} props.onBackPress - Fonction appelée lors du clic sur le bouton retour
+ * Affiche l'avatar, le nom, le statut en ligne et les options
  */
-const ChatHeader = ({ name, onBackPress }) => (
+const ChatHeader = ({ name, onBackPress, onlineStatus = false, lastSeen = '' }) => (
   <View style={styles.header}>
     <TouchableOpacity onPress={onBackPress} style={styles.backButton}>
       <Icon name="arrow-back" size={24} color={COLORS.white} />
     </TouchableOpacity>
-    <LetterAvatar name={name} />
-    <Text style={styles.headerTitle}>{name}</Text>
+    <View style={styles.headerContent}>
+      <View style={styles.avatarContainer}>
+        <Text style={styles.avatarText}>{name.charAt(0).toUpperCase()}</Text>
+      </View>
+      <View style={styles.userInfo}>
+        <Text style={styles.headerTitle}>{name}</Text>
+        <Text style={styles.statusText}>
+          {onlineStatus ? 'En ligne' : lastSeen ? `Vu(e) ${lastSeen}` : 'Hors ligne'}
+        </Text>
+      </View>
+    </View>
+    <TouchableOpacity style={styles.menuButton}>
+      <Icon name="ellipsis-vertical" size={24} color={COLORS.white} />
+    </TouchableOpacity>
   </View>
 );
 
 /**
- * Composant principal de l'écran de chat
+ * Composant principal ChatScreen
+ * Gère l'affichage et la logique du chat
  */
 const ChatScreen = ({ route, navigation }) => {
-  // Extraction des paramètres de navigation
-  const { chatId, name, updateLastMessage } = route.params;
+  // Extraction des paramètres de navigation avec valeurs par défaut
+  const { 
+    chatId = '1', 
+    name = 'User', 
+    updateLastMessage = () => {} 
+  } = route?.params || {};
   
   // États du composant
-  const [messages, setMessages] = useState(INITIAL_MESSAGES);
-  const [inputMessage, setInputMessage] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
+  const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingEarlier, setIsLoadingEarlier] = useState(false);
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [isTyping, setIsTyping] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+  const [lastSeen, setLastSeen] = useState('');
+  const [hasVibratePermission, setHasVibratePermission] = useState(false);
   
-  // Références
-  const flatListRef = useRef(null);
+  // Références pour gérer les timeouts
   const typingTimeoutRef = useRef(null);
-  const loadingMoreRef = useRef(false);
 
   /**
-   * Charge les messages initiaux au montage du composant
+   * Demande la permission de vibration sur Android
+   * @returns {Promise<void>}
    */
-  useEffect(() => {
-    loadInitialMessages();
-  }, [chatId]);
-
-  /**
-   * Gère le retour à l'écran précédent
-   */
-  const handleBack = () => {
-    navigation.goBack();
+  const requestVibratePermission = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.VIBRATE,
+          {
+            title: "Permission de vibration",
+            message: "L'application a besoin de la permission de vibration pour le retour haptique.",
+            buttonNeutral: "Demander plus tard",
+            buttonNegative: "Annuler",
+            buttonPositive: "OK"
+          }
+        );
+        setHasVibratePermission(granted === PermissionsAndroid.RESULTS.GRANTED);
+      } catch (err) {
+        console.warn('Erreur de permission vibration:', err);
+        setHasVibratePermission(false);
+      }
+    } else {
+      setHasVibratePermission(true);
+    }
   };
 
   /**
-   * Charge les messages initiaux depuis l'API
+   * Convertit les messages initiaux au format GiftedChat
+   */
+  const convertInitialMessages = useCallback(() => {
+    return INITIAL_MESSAGES
+      .map(msg => ({
+        _id: msg.id,
+        text: msg.text,
+        createdAt: new Date(msg.timestamp),
+        user: {
+          _id: msg.isSent ? 1 : 2,
+          name: msg.isSent ? 'Vous' : name,
+        },
+        sent: msg.isSent,
+        received: msg.status === 'delivered' || msg.status === 'read',
+        pending: msg.status === 'sent',
+      }))
+      .sort((a, b) => b.createdAt - a.createdAt);
+  }, [name]);
+
+  /**
+   * Charge les messages initiaux
    */
   const loadInitialMessages = async () => {
+    if (isLoading) return;
+    
     setIsLoading(true);
     try {
-      // Simulation d'un appel API
       await new Promise(resolve => setTimeout(resolve, 1000));
-      setMessages(INITIAL_MESSAGES);
+      const convertedMessages = convertInitialMessages();
+      setMessages(convertedMessages);
     } catch (error) {
+      console.error('Erreur de chargement des messages:', error);
       Alert.alert('Erreur', 'Impossible de charger les messages');
     } finally {
       setIsLoading(false);
@@ -113,233 +167,284 @@ const ChatScreen = ({ route, navigation }) => {
   };
 
   /**
-   * Charge plus de messages anciens (pagination)
+   * Effet pour initialiser le chat
    */
-  const loadMoreMessages = async () => {
-    if (!hasMoreMessages || loadingMoreRef.current) return;
+  useEffect(() => {
+    requestVibratePermission();
+    loadInitialMessages();
     
-    loadingMoreRef.current = true;
+    // Simulation des changements de statut en ligne
+    const onlineInterval = setInterval(() => {
+      setIsOnline(prev => !prev);
+      if (!isOnline) {
+        setLastSeen('il y a quelques minutes');
+      }
+    }, 30000);
+
+    return () => {
+      clearInterval(onlineInterval);
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, [chatId]);
+
+  /**
+   * Gère la vibration avec vérification des permissions
+   */
+  const handleVibration = () => {
+    if (hasVibratePermission) {
+      Vibration.vibrate(50);
+    }
+  };
+
+  /**
+   * Gère l'envoi de nouveaux messages
+   */
+  const onSend = useCallback(async (newMessages = []) => {
+    if (!newMessages.length) return;
+
+    handleVibration();
+    
+    const updatedMessages = GiftedChat.append(messages, newMessages);
+    setMessages(updatedMessages);
+
+    try {
+      updateLastMessage?.(chatId, newMessages[0].text);
+      
+      // Simulation de délai réseau
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      setIsTyping(true);
+      
+      // Simulation de réponse automatique
+      setTimeout(() => {
+        const autoResponse = {
+          _id: Date.now().toString(),
+          text: `Réponse automatique à : ${newMessages[0].text}`,
+          createdAt: new Date(),
+          user: {
+            _id: 2,
+            name: name,
+          },
+        };
+
+        setMessages(prev => GiftedChat.append(prev, [autoResponse]));
+        setIsTyping(false);
+      }, 3000);
+
+    } catch (error) {
+      console.error('Erreur d\'envoi du message:', error);
+      Alert.alert('Erreur', 'Impossible d\'envoyer le message');
+    }
+  }, [chatId, name, updateLastMessage, messages, hasVibratePermission]);
+
+  /**
+   * Gère le chargement des messages plus anciens
+   */
+  const onLoadEarlier = async () => {
+    if (isLoadingEarlier || !hasMoreMessages) return;
+    
+    setIsLoadingEarlier(true);
     try {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      const oldestMessageDate = new Date(messages[messages.length - 1].timestamp);
-      const newMessages = [
-        {
-          id: `old-${Date.now()}`,
-          text: 'Message plus ancien',
-          timestamp: new Date(oldestMessageDate.getTime() - 86400000).toISOString(),
-          isSent: Math.random() > 0.5,
-          status: 'read',
+      // Génération de messages historiques
+      const oldMessages = Array.from({ length: 5 }, (_, index) => ({
+        _id: `old-${Date.now()}-${index}`,
+        text: `Message historique ${index + 1}`,
+        createdAt: new Date(Date.now() - (86400000 * (index + 1))),
+        user: {
+          _id: Math.random() > 0.5 ? 1 : 2,
+          name: Math.random() > 0.5 ? 'Vous' : name,
         },
-      ];
+      }));
+
+      setMessages(previousMessages => GiftedChat.append(previousMessages, oldMessages));
       
-      setMessages(prev => [...prev, ...newMessages]);
-      
-      if (messages.length > 30) {
+      if (messages.length > 50) {
         setHasMoreMessages(false);
       }
     } catch (error) {
+      console.error('Erreur de chargement des anciens messages:', error);
       Alert.alert('Erreur', 'Impossible de charger plus de messages');
     } finally {
-      loadingMoreRef.current = false;
+      setIsLoadingEarlier(false);
     }
   };
 
   /**
-   * Gère la saisie de message et l'indicateur de frappe
+   * Gère l'indicateur de frappe
    */
-  const handleTyping = (text) => {
-    setInputMessage(text);
-    
-    if (!isTyping) {
+  const handleInputTextChanged = text => {
+    if (text.length > 0) {
       setIsTyping(true);
-    }
-
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-
-    typingTimeoutRef.current = setTimeout(() => {
-      setIsTyping(false);
-    }, 1500);
-  };
-
-  /**
-   * Envoie un nouveau message
-   */
-  const handleSend = async () => {
-    if (!inputMessage.trim()) return;
-
-    const newMessage = {
-      id: Date.now().toString(),
-      text: inputMessage.trim(),
-      timestamp: new Date().toISOString(),
-      isSent: true,
-      status: 'sent',
-    };
-
-    setMessages(prev => [newMessage, ...prev]);
-    setInputMessage('');
-    updateLastMessage?.(chatId, newMessage.text);
-
-    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setMessages(prev =>
-        prev.map(msg =>
-          msg.id === newMessage.id
-            ? { ...msg, status: 'delivered' }
-            : msg
-        )
-      );
-
-      // Simulation d'une réponse automatique
-      const autoResponse = {
-        id: (Date.now() + 1).toString(),
-        text: `Réponse automatique à : ${newMessage.text}`,
-        timestamp: new Date().toISOString(),
-        isSent: false,
-        status: 'read',
-      };
-
-      setTimeout(() => {
-        setMessages(prev => [autoResponse, ...prev]);
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      typingTimeoutRef.current = setTimeout(() => {
+        setIsTyping(false);
       }, 2000);
-
-    } catch (error) {
-      Alert.alert('Erreur', 'Impossible d\'envoyer le message');
+    } else {
+      setIsTyping(false);
     }
   };
 
-  /**
-   * Rendu d'un message individuel
-   */
-  const renderMessage = ({ item }) => (
-    <View style={[
-      styles.messageContainer,
-      item.isSent ? styles.sentMessage : styles.receivedMessage
-    ]}>
-      <Text style={[
-        styles.messageText,
-        item.isSent ? styles.sentMessageText : styles.receivedMessageText
-      ]}>
-        {item.text}
-      </Text>
-      
-      <View style={styles.messageFooter}>
-        <Text style={styles.messageTimestamp}>
-          {new Date(item.timestamp).toLocaleTimeString('fr-FR', {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
-        </Text>
-        
-        {item.isSent && (
-          <View style={styles.messageStatus}>
-            {item.status === 'sent' && <Icon name="checkmark" size={16} color={COLORS.white} />}
-            {item.status === 'delivered' && <Icon name="checkmark-done" size={16} color={COLORS.white} />}
-            {item.status === 'read' && <Icon name="checkmark-done" size={16} color={COLORS.primary} />}
-          </View>
-        )}
+  // Composants de rendu personnalisés
+  const renderBubble = useCallback(props => (
+    <Bubble
+      {...props}
+      wrapperStyle={{
+        right: {
+          backgroundColor: COLORS.primary,
+        },
+        left: {
+          backgroundColor: '#262628',
+        },
+      }}
+      textStyle={{
+        right: {
+          color: COLORS.white,
+        },
+        left: {
+          color: COLORS.white,
+        },
+      }}
+    />
+  ), []);
+
+  const renderSend = useCallback(props => (
+    <Send {...props}>
+      <View style={styles.sendButton}>
+        <Icon name="send" size={24} color={COLORS.primary} />
       </View>
+    </Send>
+  ), []);
+
+  const renderInputToolbar = useCallback(props => (
+    <InputToolbar
+      {...props}
+      containerStyle={{
+        backgroundColor: COLORS.noir,
+        borderTopWidth: 1,
+        borderTopColor: '#262628',
+      }}
+      primaryStyle={{ alignItems: 'center' }}
+    />
+  ), []);
+
+  const renderComposer = useCallback(props => (
+    <Composer
+      {...props}
+      textInputStyle={{
+        color: COLORS.white,
+        backgroundColor: '#262628',
+        borderRadius: 20,
+        paddingHorizontal: 12,
+        marginLeft: 0,
+        marginTop: 5,
+        marginBottom: 5,
+      }}
+    />
+  ), []);
+
+  const renderLoading = useCallback(() => (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color={COLORS.primary} />
     </View>
-  );
+  ), []);
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <ChatHeader name={name} onBackPress={handleBack} />
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
-      >
-        {/* Zone des messages */}
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
-          </View>
-        ) : (
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            renderItem={renderMessage}
-            keyExtractor={item => item.id}
-            inverted
-            contentContainerStyle={styles.messagesList}
-            onEndReached={loadMoreMessages}
-            onEndReachedThreshold={0.5}
-            ListFooterComponent={
-              hasMoreMessages && messages.length > 0 ? (
-                <ActivityIndicator style={styles.loadingMore} />
-              ) : null
-            }
-          />
-        )}
-
-        {/* Indicateur de frappe */}
-        {isTyping && (
-          <View style={styles.typingIndicator}>
-            <ActivityIndicator size="small" color={COLORS.primary} />
-            <Text style={styles.typingText}>En train d'écrire...</Text>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <ChatHeader 
+        name={name} 
+        onBackPress={() => navigation.goBack()} 
+        onlineStatus={isOnline}
+        lastSeen={lastSeen}
+      />
+      <GiftedChat
+        messages={messages}
+        onSend={onSend}
+        user={{ _id: 1 }}
+        renderBubble={renderBubble}
+        renderSend={renderSend}
+        renderInputToolbar={renderInputToolbar}
+        renderComposer={renderComposer}
+        renderLoading={renderLoading}
+        loadEarlier={hasMoreMessages}
+        isLoadingEarlier={isLoadingEarlier}
+        onLoadEarlier={onLoadEarlier}
+        infiniteScroll={true}
+        placeholder="Écrivez un message..."
+        onInputTextChanged={handleInputTextChanged}
+        isTyping={isTyping}
+        renderChatEmpty={() => (
+          <View style={styles.emptyChat}>
+            <Text style={styles.emptyChatText}>Aucun message</Text>
           </View>
         )}
-
-        {/* Zone de saisie */}
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            value={inputMessage}
-            onChangeText={handleTyping}
-            placeholder="Écrivez un message..."
-            placeholderTextColor="#424242"
-            multiline
-            maxLength={500}
+        placeholderTextColor="#666"
+        locale="fr"
+        timeFormat="HH:mm"
+        dateFormat="LL"
+        isLoading={isLoading}
+        renderSystemMessage={props => (
+          <SystemMessage
+            {...props}
+            textStyle={{ color: '#666', fontSize: 12 }}
           />
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              !inputMessage.trim() && styles.sendButtonDisabled
-            ]}
-            onPress={handleSend}
-            disabled={!inputMessage.trim()}
-          >
-            <Icon
-              name="send"
-              size={24}
-              color={inputMessage.trim() ? COLORS.primary : '#999999'}
-            />
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
+        )}
+        listViewProps={{
+          style: styles.listView,
+          contentContainerStyle: styles.listContent,
+        }}
+        inverted={true}
+        alignTop={false}
+      />
     </SafeAreaView>
   );
 };
 
+/**
+ * Styles du composant
+ */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.noir,
   },
-  // Styles du header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#262628',
+    justifyContent: 'space-between',
+  },
+  headerContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   backButton: {
+    padding: 8,
+  },
+  menuButton: {
     padding: 8,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: COLORS.white,
+  },
+  userInfo: {
     marginLeft: 12,
   },
-  // Styles de l'avatar
+  statusText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
   avatarContainer: {
     width: 40,
     height: 40,
@@ -354,100 +459,30 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
-  // Styles des messages
-  loadingContainer: {
+    loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  messagesList: {
-    padding: 16,
-  },
-  messageContainer: {
-    maxWidth: '80%',
-    marginVertical: 4,
-    padding: 12,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  sentMessage: {
-    alignSelf: 'flex-end',
-    backgroundColor: COLORS.primary,
-  },
-  receivedMessage: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#262628',
-  },
-  messageText: {
-    fontSize: 16,
-    marginBottom: 4,
-  },
-  sentMessageText: {
-    color: COLORS.white,
-  },
-  receivedMessageText: {
-    color: COLORS.white,
-  },
-  messageFooter: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-  },
-  messageTimestamp: {
-    fontSize: 12,
-    color: COLORS.white,
-    marginRight: 4,
-    opacity: 0.7,
-  },
-  messageStatus: {
-    flexDirection: 'row',
-  },
-  // Styles de la zone de saisie
-  inputContainer: {
-    flexDirection: 'row',
-    padding: 16,
-    backgroundColor: COLORS.noir,
-    alignItems: 'flex-end',
-    borderTopWidth: 1,
-    borderTopColor: '#262628',
-  },
-  input: {
-    flex: 1,
-    backgroundColor: '#262628',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 8,
-    maxHeight: 100,
-    color: COLORS.white,
   },
   sendButton: {
+    marginRight: 10,
+    marginBottom: 5,
+  },
+  listView: {
+    backgroundColor: COLORS.noir,
+  },
+  listContent: {
+    paddingVertical: 10,
+  },
+  emptyChat: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    marginTop: 50,
   },
-  sendButtonDisabled: {
-    opacity: 0.5,
-  },
-  typingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-    marginLeft: 16,
-  },
-  typingText: {
-    marginLeft: 8,
+  emptyChatText: {
     color: '#666',
-    fontSize: 12,
-  },
-  loadingMore: {
-    padding: 16,
+    fontSize: 16,
   },
 });
 
